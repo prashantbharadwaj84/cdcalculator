@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#090d16] text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CD Interest & Growth Calculator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cloud: {
+                            bg: '#090d16',
+                            card: '#111827',
+                            border: 'rgba(255, 255, 255, 0.08)',
+                            accent: '#38bdf8', // Cyan
+                            purple: '#818cf8',  // Indigo/Violet
+                        }
+                    },
+                    boxShadow: {
+                        glow: '0 0 25px -5px rgba(56, 189, 248, 0.15)',
+                        'glow-purple': '0 0 25px -5px rgba(129, 140, 248, 0.2)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom smooth scrollbar & glassmorphism utilities */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-panel-hover {
+            transition: all 0.25s ease-in-out;
+        }
+        .glass-panel-hover:hover {
+            border-color: rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 20px -5px rgba(56, 189, 248, 0.15);
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 320px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 380px;
+            }
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-full flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-black bg-[#090d16] text-slate-100">
+
+    <!-- Ambient Background Glow Effects -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div class="absolute -top-40 -left-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+        <div class="absolute top-1/3 -right-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="relative z-10 border-b border-slate-800/80 bg-[#090d16]/80 backdrop-blur-md sticky top-0">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-slate-900 border border-slate-700/60 rounded-xl text-cyan-400 shadow-glow">
+                    <i data-lucide="cloud-lightning" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white">CD Growth Calculator</h1>
+                    <p class="text-xs text-slate-400 mt-0.5">see how your investments affects the yield</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Presets / Quick Scenarios Bar -->
+        <section class="glass-panel rounded-xl p-3">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2 text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    <span>Quick Scenarios:</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <button type="button" onclick="loadPreset('standard')" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 transition flex-1 sm:flex-none text-center">
+                        💵 $10k Standard (12 Mo @ 4.00%)
+                    </button>
+                    <button type="button" onclick="loadPreset('highYield')" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 transition flex-1 sm:flex-none text-center">
+                        📈 $25k High Yield (3 Yr @ 4.50%)
+                    </button>
+                    <button type="button" onclick="loadPreset('longTerm')" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 transition flex-1 sm:flex-none text-center">
+                        🚀 $50k Lock-In (5 Yr @ 4.25%)
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Interactive Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            <!-- Left Panel: Input Controls -->
+            <div class="lg:col-span-5 glass-panel rounded-2xl p-4 space-y-4">
+                <div class="border-b border-slate-800 pb-2.5 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-4 h-4 text-cyan-400"></i>
+                            Calculate your yields
+                        </h2>
+                    </div>
+                    <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">Monthly Compounding</span>
+                </div>
+
+                <form id="cd-form" onsubmit="event.preventDefault();" class="space-y-3 text-xs">
+                    
+                    <!-- Initial Deposit (Compact Inline) -->
+                    <div class="p-2 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="initialDeposit" class="font-semibold uppercase tracking-wider text-slate-400 text-[11px]">Initial Deposit</label>
+                            <span class="font-mono font-bold text-cyan-400 text-[11px]" id="deposit-badge">$10,000</span>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-medium">$</span>
+                            <input type="number" id="initialDeposit" value="10000" min="0" step="100" class="w-full pl-7 pr-3 py-1.5 bg-slate-900 border border-slate-700/70 rounded-lg focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-white text-xs font-semibold font-mono transition outline-none" oninput="calculateCD()">
+                        </div>
+                    </div>
+
+                    <!-- Interest Rate / APY & Term Duration Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <!-- APY Input -->
+                        <div class="p-2 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                            <div class="flex items-center justify-between mb-1">
+                                <label for="apy" class="font-semibold uppercase tracking-wider text-slate-400 text-[11px]">APY Rate</label>
+                                <span class="font-mono font-bold text-cyan-400 text-[11px]" id="apy-badge">4.00%</span>
+                            </div>
+                            <div class="relative">
+                                <input type="number" id="apy" value="4.00" min="0.01" max="30" step="0.05" class="w-full pl-3 pr-7 py-1.5 bg-slate-900 border border-slate-700/70 rounded-lg focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-white text-xs font-semibold font-mono transition outline-none" oninput="calculateCD()">
+                                <span class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 font-medium">%</span>
+                            </div>
+                        </div>
+
+                        <!-- Term Duration Input -->
+                        <div class="p-2 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                            <div class="flex items-center justify-between mb-1">
+                                <label for="termLength" class="font-semibold uppercase tracking-wider text-slate-400 text-[11px]">Term Duration</label>
+                            </div>
+                            <div class="flex gap-1.5">
+                                <input type="number" id="termLength" value="12" min="1" max="360" step="1" class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700/70 rounded-lg focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-white text-xs font-semibold font-mono transition outline-none" oninput="calculateCD()">
+                                <select id="termUnit" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg focus:ring-1 focus:ring-cyan-500 px-2 py-1.5 cursor-pointer outline-none" onchange="calculateCD()">
+                                    <option value="months" selected>Mo</option>
+                                    <option value="years">Yr</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+
+            <!-- Right Panel: Financial Results & Visualizer -->
+            <div class="lg:col-span-7 space-y-6">
+
+                <!-- Summary Key Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    
+                    <!-- Total Balance -->
+                    <div class="glass-panel rounded-2xl p-4 relative overflow-hidden group glass-panel-hover">
+                        <div class="absolute -right-2 -bottom-2 opacity-5 text-cyan-400 group-hover:opacity-10 transition">
+                            <i data-lucide="wallet" class="w-20 h-20"></i>
+                        </div>
+                        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Maturity Balance</p>
+                        <p class="text-xl sm:text-2xl font-extrabold text-white mt-1.5 tracking-tight font-mono" id="res-total-balance">$0.00</p>
+                        <p class="text-[10px] text-cyan-400 mt-0.5 font-mono" id="res-maturity-date">At Maturity</p>
+                    </div>
+
+                    <!-- Interest Earned -->
+                    <div class="glass-panel rounded-2xl p-4 relative overflow-hidden group glass-panel-hover">
+                        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Interest Earned</p>
+                        <p class="text-xl sm:text-2xl font-extrabold text-cyan-400 mt-1.5 tracking-tight font-mono" id="res-total-interest">$0.00</p>
+                        <p class="text-[10px] text-emerald-400 mt-0.5 font-mono font-medium" id="res-interest-pct">+0% return</p>
+                    </div>
+
+                    <!-- Effective Annual Yield -->
+                    <div class="glass-panel rounded-2xl p-4 relative overflow-hidden group glass-panel-hover">
+                        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Effective APY</p>
+                        <p class="text-xl sm:text-2xl font-extrabold text-indigo-400 mt-1.5 tracking-tight font-mono" id="res-effective-yield">0.00%</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Monthly Compounded</p>
+                    </div>
+
+                </div>
+
+                <!-- Chart Container Box -->
+                <div class="glass-panel rounded-2xl p-5 space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                        <div>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+                                Growth Projection Spectrum
+                            </h3>
+                            <p class="text-xs text-slate-400">Principal Deposit vs. Accumulated Interest</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="inline-flex items-center text-xs text-slate-400 font-medium">
+                                <span class="w-2.5 h-2.5 rounded-full bg-slate-600 inline-block mr-1.5"></span> Initial Principal
+                            </span>
+                            <span class="inline-flex items-center text-xs text-slate-400 font-medium">
+                                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block mr-1.5"></span> Earned Interest
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <canvas id="growthChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Amortization / Breakdown Schedule Table Section -->
+        <section class="glass-panel rounded-2xl p-5 space-y-3">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-800 pb-3">
+                <div>
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+                        Schedule Breakdown Ledger
+                    </h3>
+                    <p class="text-xs text-slate-400">Monthly compound yield details</p>
+                </div>
+                
+                <!-- View Toggle Buttons -->
+                <div class="inline-flex p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-semibold">
+                    <button type="button" id="btn-view-yearly" onclick="setScheduleView('yearly')" class="px-3 py-1 rounded-lg text-slate-400 hover:text-white transition">
+                        Yearly View
+                    </button>
+                    <button type="button" id="btn-view-monthly" onclick="setScheduleView('monthly')" class="px-3 py-1 rounded-lg bg-slate-800 text-white shadow-sm transition">
+                        Monthly View
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto rounded-xl border border-slate-800/80 max-h-80 overflow-y-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead class="bg-slate-900/90 sticky top-0 border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold font-mono">
+                        <tr>
+                            <th class="py-2.5 px-4">Period</th>
+                            <th class="py-2.5 px-4">Start Balance</th>
+                            <th class="py-2.5 px-4 text-cyan-400">Interest Earned</th>
+                            <th class="py-2.5 px-4 text-cyan-400">Total Cumulative Interest</th>
+                            <th class="py-2.5 px-4 text-right">End Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedule-tbody" class="divide-y divide-slate-800/60 font-mono text-slate-300">
+                        <!-- Populated dynamically via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Best CD Rates & Resource Links Section -->
+        <section class="glass-panel rounded-2xl p-5 space-y-4">
+            <div class="border-b border-slate-800 pb-3 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                <div>
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i data-lucide="award" class="w-4 h-4 text-cyan-400"></i>
+                        Top High-Yield CD Rates & Marketplace Comparison
+                    </h3>
+                    <p class="text-xs text-slate-400">Explore top FDIC-insured CD providers and live yield comparisons</p>
+                </div>
+                <span class="text-[10px] uppercase font-mono tracking-wider text-slate-500 bg-slate-900 px-2.5 py-1 rounded-full border border-slate-800">FDIC / NCUA Insured Partners</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                <!-- Marcus by Goldman Sachs -->
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-2.5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <h4 class="text-xs font-bold text-white">Marcus by Goldman Sachs</h4>
+                            <p class="text-[11px] text-slate-400 mt-0.5">High-yield short & long-term CDs</p>
+                        </div>
+                        <span class="p-1 rounded-lg bg-cyan-950/80 border border-cyan-800/50 text-cyan-400">
+                            <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 space-y-0.5">
+                        <div class="flex justify-between"><span>No-Penalty Options:</span><span class="text-slate-200 font-mono">Available</span></div>
+                        <div class="flex justify-between"><span>Min. Deposit:</span><span class="text-slate-200 font-mono">$500</span></div>
+                    </div>
+                    <a href="https://www.marcus.com/us/en/savings/high-yield-cds" target="_blank" rel="noopener noreferrer" class="w-full text-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-black text-cyan-400 transition flex items-center justify-center gap-1.5">
+                        <span>Visit Marcus</span>
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                </div>
+
+                <!-- Ally Bank -->
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-2.5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <h4 class="text-xs font-bold text-white">Ally Bank</h4>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Flexible High-Yield & Raise Your Rate CDs</p>
+                        </div>
+                        <span class="p-1 rounded-lg bg-indigo-950/80 border border-indigo-800/50 text-indigo-400">
+                            <i data-lucide="landmark" class="w-3.5 h-3.5"></i>
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 space-y-0.5">
+                        <div class="flex justify-between"><span>Minimum Deposit:</span><span class="text-slate-200 font-mono">$0</span></div>
+                        <div class="flex justify-between"><span>Compounding:</span><span class="text-slate-200 font-mono">Daily</span></div>
+                    </div>
+                    <a href="https://www.ally.com/bank/high-yield-cd/" target="_blank" rel="noopener noreferrer" class="w-full text-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-indigo-500 hover:text-white text-indigo-400 transition flex items-center justify-center gap-1.5">
+                        <span>Visit Ally Bank</span>
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                </div>
+
+                <!-- Discover Bank -->
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-2.5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <h4 class="text-xs font-bold text-white">Discover Bank</h4>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Top APY rates from 3 months to 10 years</p>
+                        </div>
+                        <span class="p-1 rounded-lg bg-emerald-950/80 border border-emerald-800/50 text-emerald-400">
+                            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 space-y-0.5">
+                        <div class="flex justify-between"><span>Min. Deposit:</span><span class="text-slate-200 font-mono">$2,500</span></div>
+                        <div class="flex justify-between"><span>Terms Offered:</span><span class="text-slate-200 font-mono">3 Mo - 10 Yr</span></div>
+                    </div>
+                    <a href="https://www.discover.com/online-banking/certificate-of-deposit/" target="_blank" rel="noopener noreferrer" class="w-full text-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-emerald-500 hover:text-black text-emerald-400 transition flex items-center justify-center gap-1.5">
+                        <span>Visit Discover</span>
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                </div>
+
+                <!-- Capital One 360 -->
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-2.5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <h4 class="text-xs font-bold text-white">Capital One 360</h4>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Competitive rates with zero minimum deposit</p>
+                        </div>
+                        <span class="p-1 rounded-lg bg-cyan-950/80 border border-cyan-800/50 text-cyan-400">
+                            <i data-lucide="credit-card" class="w-3.5 h-3.5"></i>
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 space-y-0.5">
+                        <div class="flex justify-between"><span>Minimum Deposit:</span><span class="text-slate-200 font-mono">$0</span></div>
+                        <div class="flex justify-between"><span>Interest Payouts:</span><span class="text-slate-200 font-mono">Monthly / Annual</span></div>
+                    </div>
+                    <a href="https://www.capitalone.com/bank/cds/" target="_blank" rel="noopener noreferrer" class="w-full text-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-black text-cyan-400 transition flex items-center justify-center gap-1.5">
+                        <span>Visit Capital One</span>
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                </div>
+
+                <!-- Bankrate Comparison Tool -->
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between space-y-2.5 lg:col-span-2">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <h4 class="text-xs font-bold text-white">Bankrate CD Comparison Engine</h4>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Compare real-time nationwide CD interest rates across all banks & credit unions</p>
+                        </div>
+                        <span class="p-1 rounded-lg bg-purple-950/80 border border-purple-800/50 text-purple-400">
+                            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        Search high-yield rates for 6-month, 1-year, and 5-year terms updated daily from top national banks.
+                    </p>
+                    <a href="https://www.bankrate.com/banking/cds/cd-rates/" target="_blank" rel="noopener noreferrer" class="w-full text-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-purple-500 hover:text-white text-purple-400 transition flex items-center justify-center gap-1.5">
+                        <span>Compare All Rates on Bankrate</span>
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-[#090d16] text-slate-500 text-xs py-6 text-center mt-auto">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p>&copy; <span id="year"></span> CD Calculator. Minimalist Financial Cloud Tool.</p>
+            <div class="flex items-center gap-4 text-slate-400">
+                <span class="hover:text-cyan-400 transition cursor-pointer">Security</span>
+                <span class="hover:text-cyan-400 transition cursor-pointer">Privacy</span>
+                <span class="hover:text-cyan-400 transition cursor-pointer">API</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        let growthChart = null;
+        let scheduleView = 'monthly';
+        let cachedScheduleData = [];
+
+        const formatCurrency = (amount) => {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                maximumFractionDigits: 2
+            }).format(amount);
+        };
+
+        const formatPercent = (val) => `${val.toFixed(2)}%`;
+
+        function loadPreset(type) {
+            if (type === 'standard') {
+                document.getElementById('initialDeposit').value = 10000;
+                document.getElementById('apy').value = 4.00;
+                document.getElementById('termLength').value = 12;
+                document.getElementById('termUnit').value = 'months';
+            } else if (type === 'highYield') {
+                document.getElementById('initialDeposit').value = 25000;
+                document.getElementById('apy').value = 4.50;
+                document.getElementById('termLength').value = 3;
+                document.getElementById('termUnit').value = 'years';
+            } else if (type === 'longTerm') {
+                document.getElementById('initialDeposit').value = 50000;
+                document.getElementById('apy').value = 4.25;
+                document.getElementById('termLength').value = 5;
+                document.getElementById('termUnit').value = 'years';
+            }
+            calculateCD();
+        }
+
+        function calculateCD() {
+            const P = parseFloat(document.getElementById('initialDeposit').value) || 0;
+            const rPercent = parseFloat(document.getElementById('apy').value) || 0;
+            const rate = rPercent / 100;
+            const termVal = parseFloat(document.getElementById('termLength').value) || 0;
+            const termUnit = document.getElementById('termUnit').value;
+
+            // Compounding frequency locked to monthly (12/year)
+            const n = 12;
+
+            const totalMonths = termUnit === 'years' ? Math.round(termVal * 12) : Math.round(termVal);
+
+            document.getElementById('deposit-badge').textContent = formatCurrency(P);
+            document.getElementById('apy-badge').textContent = formatPercent(rPercent);
+
+            let schedule = [];
+            let currentBalance = P;
+            let cumulativeInterest = 0;
+            const compRatePerMonth = rate / 12;
+
+            for (let month = 1; month <= totalMonths; month++) {
+                const startBal = currentBalance;
+                const monthInterest = startBal * compRatePerMonth;
+
+                currentBalance += monthInterest;
+                cumulativeInterest += monthInterest;
+
+                schedule.push({
+                    month: month,
+                    year: Math.ceil(month / 12),
+                    startBalance: startBal,
+                    monthInterest: monthInterest,
+                    totalInterest: cumulativeInterest,
+                    endBalance: currentBalance,
+                    principal: P
+                });
+            }
+
+            cachedScheduleData = schedule;
+
+            const endBalance = currentBalance;
+            const totalInterestEarned = cumulativeInterest;
+            const returnPct = P > 0 ? (totalInterestEarned / P) * 100 : 0;
+
+            // Effective APY with monthly compounding
+            const effectiveYield = P > 0 ? (Math.pow((1 + compRatePerMonth), 12) - 1) * 100 : 0;
+
+            document.getElementById('res-total-balance').textContent = formatCurrency(endBalance);
+            document.getElementById('res-total-interest').textContent = formatCurrency(totalInterestEarned);
+            document.getElementById('res-interest-pct').textContent = `+${returnPct.toFixed(1)}% total return`;
+            document.getElementById('res-effective-yield').textContent = formatPercent(effectiveYield);
+
+            const matDate = new Date();
+            matDate.setMonth(matDate.getMonth() + totalMonths);
+            document.getElementById('res-maturity-date').textContent = `Maturity: ${matDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+
+            updateChart(schedule, P);
+            renderScheduleTable();
+        }
+
+        function updateChart(schedule, initialP) {
+            const ctx = document.getElementById('growthChart').getContext('2d');
+
+            let labels = [];
+            let principalData = [];
+            let interestData = [];
+
+            const isLongTerm = schedule.length > 36;
+            
+            schedule.forEach((item) => {
+                if (!isLongTerm || item.month % 12 === 0 || item.month === schedule.length) {
+                    labels.push(isLongTerm ? `Year ${item.year}` : `Mo ${item.month}`);
+                    principalData.push(initialP);
+                    interestData.push(item.totalInterest);
+                }
+            });
+
+            if (growthChart) {
+                growthChart.destroy();
+            }
+
+            growthChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Initial Principal',
+                            data: principalData,
+                            backgroundColor: '#334155', // slate-700
+                            borderRadius: 4,
+                        },
+                        {
+                            label: 'Interest Earned',
+                            data: interestData,
+                            backgroundColor: '#38bdf8', // cyan-400
+                            borderRadius: 4,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: '#0f172a',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            titleColor: '#f8fafc',
+                            bodyColor: '#cbd5e1',
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += formatCurrency(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: { display: false },
+                            ticks: { color: '#64748b', font: { family: 'monospace', size: 10 } }
+                        },
+                        y: {
+                            stacked: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#64748b',
+                                font: { family: 'monospace', size: 10 },
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function setScheduleView(view) {
+            scheduleView = view;
+            const btnYearly = document.getElementById('btn-view-yearly');
+            const btnMonthly = document.getElementById('btn-view-monthly');
+
+            if (view === 'yearly') {
+                btnYearly.className = "px-3 py-1.5 rounded-lg bg-slate-800 text-white shadow-sm transition";
+                btnMonthly.className = "px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+            } else {
+                btnMonthly.className = "px-3 py-1.5 rounded-lg bg-slate-800 text-white shadow-sm transition";
+                btnYearly.className = "px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+            }
+            renderScheduleTable();
+        }
+
+        function renderScheduleTable() {
+            const tbody = document.getElementById('schedule-tbody');
+            tbody.innerHTML = '';
+
+            if (!cachedScheduleData.length) return;
+
+            let displayRows = [];
+
+            if (scheduleView === 'yearly') {
+                let yearMap = {};
+                cachedScheduleData.forEach(item => {
+                    const y = item.year;
+                    if (!yearMap[y]) {
+                        yearMap[y] = {
+                            period: `Year ${y}`,
+                            startBalance: item.startBalance,
+                            interestEarned: 0,
+                            totalInterest: item.totalInterest,
+                            endBalance: item.endBalance
+                        };
+                    }
+                    yearMap[y].interestEarned += item.monthInterest;
+                    yearMap[y].totalInterest = item.totalInterest;
+                    yearMap[y].endBalance = item.endBalance;
+                });
+
+                displayRows = Object.values(yearMap);
+            } else {
+                displayRows = cachedScheduleData.map(item => ({
+                    period: `Month ${item.month}`,
+                    startBalance: item.startBalance,
+                    interestEarned: item.monthInterest,
+                    totalInterest: item.totalInterest,
+                    endBalance: item.endBalance
+                }));
+            }
+
+            displayRows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition border-b border-slate-800/50";
+                tr.innerHTML = `
+                    <td class="py-2.5 px-4 font-semibold text-white">${row.period}</td>
+                    <td class="py-2.5 px-4 text-slate-400">${formatCurrency(row.startBalance)}</td>
+                    <td class="py-2.5 px-4 font-semibold text-cyan-400">+${formatCurrency(row.interestEarned)}</td>
+                    <td class="py-2.5 px-4 text-cyan-300">${formatCurrency(row.totalInterest)}</td>
+                    <td class="py-2.5 px-4 text-right font-bold text-white">${formatCurrency(row.endBalance)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            document.getElementById('year').textContent = new Date().getFullYear();
+            calculateCD();
+        });
+    </script>
+</body>
+</html>
