@@ -132,7 +132,7 @@
                             Calculate your yields
                         </h2>
                     </div>
-                    <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">Monthly Compounding</span>
+                    <span id="compounding-badge" class="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">Monthly Compounding</span>
                 </div>
 
                 <form id="cd-form" onsubmit="event.preventDefault();" class="space-y-3 text-xs">
@@ -178,6 +178,17 @@
                         </div>
                     </div>
 
+                    <!-- Compounding Frequency Selector -->
+                    <div class="p-2 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="compoundingFreq" class="font-semibold uppercase tracking-wider text-slate-400 text-[11px]">Compounding Frequency</label>
+                        </div>
+                        <select id="compoundingFreq" class="w-full bg-slate-900 border border-slate-700/70 text-white text-xs font-semibold font-mono rounded-lg focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 px-3 py-1.5 cursor-pointer outline-none transition" onchange="calculateCD()">
+                            <option value="monthly" selected>Monthly (12/yr)</option>
+                            <option value="daily">Daily (365/yr)</option>
+                        </select>
+                    </div>
+
                 </form>
             </div>
 
@@ -208,7 +219,7 @@
                     <div class="glass-panel rounded-2xl p-4 relative overflow-hidden group glass-panel-hover">
                         <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Effective APY</p>
                         <p class="text-xl sm:text-2xl font-extrabold text-indigo-400 mt-1.5 tracking-tight font-mono" id="res-effective-yield">0.00%</p>
-                        <p class="text-[10px] text-slate-400 mt-0.5">Monthly Compounded</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5" id="res-compounding-type">Monthly Compounded</p>
                     </div>
 
                 </div>
@@ -410,10 +421,11 @@
     <!-- Footer -->
     <footer class="border-t border-slate-800/80 bg-[#090d16] text-slate-500 text-xs py-6 text-center mt-auto">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
-            <p>&copy; <span id="year"></span> Bharrys Ventures. CD Calculator tool</p>
+            <p>&copy; <span id="year"></span> CD Calculator. Minimalist Financial Cloud Tool.</p>
             <div class="flex items-center gap-4 text-slate-400">
                 <span class="hover:text-cyan-400 transition cursor-pointer">Security</span>
                 <span class="hover:text-cyan-400 transition cursor-pointer">Privacy</span>
+                <span class="hover:text-cyan-400 transition cursor-pointer">API</span>
             </div>
         </div>
     </footer>
@@ -440,16 +452,19 @@
                 document.getElementById('apy').value = 4.00;
                 document.getElementById('termLength').value = 12;
                 document.getElementById('termUnit').value = 'months';
+                document.getElementById('compoundingFreq').value = 'monthly';
             } else if (type === 'highYield') {
                 document.getElementById('initialDeposit').value = 25000;
                 document.getElementById('apy').value = 4.50;
                 document.getElementById('termLength').value = 3;
                 document.getElementById('termUnit').value = 'years';
+                document.getElementById('compoundingFreq').value = 'monthly';
             } else if (type === 'longTerm') {
                 document.getElementById('initialDeposit').value = 50000;
                 document.getElementById('apy').value = 4.25;
                 document.getElementById('termLength').value = 5;
                 document.getElementById('termUnit').value = 'years';
+                document.getElementById('compoundingFreq').value = 'monthly';
             }
             calculateCD();
         }
@@ -460,11 +475,20 @@
             const rate = rPercent / 100;
             const termVal = parseFloat(document.getElementById('termLength').value) || 0;
             const termUnit = document.getElementById('termUnit').value;
-
-            // Compounding frequency locked to monthly (12/year)
-            const n = 12;
+            const compFreq = document.getElementById('compoundingFreq').value;
 
             const totalMonths = termUnit === 'years' ? Math.round(termVal * 12) : Math.round(termVal);
+
+            // Dynamic badge & card footer text update
+            const badge = document.getElementById('compounding-badge');
+            const compoundingType = document.getElementById('res-compounding-type');
+            if (compFreq === 'daily') {
+                if (badge) badge.textContent = 'Daily Compounding';
+                if (compoundingType) compoundingType.textContent = 'Daily Compounded';
+            } else {
+                if (badge) badge.textContent = 'Monthly Compounding';
+                if (compoundingType) compoundingType.textContent = 'Monthly Compounded';
+            }
 
             document.getElementById('deposit-badge').textContent = formatCurrency(P);
             document.getElementById('apy-badge').textContent = formatPercent(rPercent);
@@ -472,11 +496,23 @@
             let schedule = [];
             let currentBalance = P;
             let cumulativeInterest = 0;
-            const compRatePerMonth = rate / 12;
+
+            const daysPerMonth = 365 / 12; // ~30.4167 days per month average
 
             for (let month = 1; month <= totalMonths; month++) {
                 const startBal = currentBalance;
-                const monthInterest = startBal * compRatePerMonth;
+                let monthInterest = 0;
+
+                if (compFreq === 'daily') {
+                    // Daily compounding formula: balance * (1 + rate/365)^days
+                    const dailyRate = rate / 365;
+                    const monthEndBalance = startBal * Math.pow(1 + dailyRate, daysPerMonth);
+                    monthInterest = monthEndBalance - startBal;
+                } else {
+                    // Monthly compounding formula
+                    const compRatePerMonth = rate / 12;
+                    monthInterest = startBal * compRatePerMonth;
+                }
 
                 currentBalance += monthInterest;
                 cumulativeInterest += monthInterest;
@@ -498,8 +534,15 @@
             const totalInterestEarned = cumulativeInterest;
             const returnPct = P > 0 ? (totalInterestEarned / P) * 100 : 0;
 
-            // Effective APY with monthly compounding
-            const effectiveYield = P > 0 ? (Math.pow((1 + compRatePerMonth), 12) - 1) * 100 : 0;
+            // Effective APY Calculation
+            let effectiveYield = 0;
+            if (P > 0) {
+                if (compFreq === 'daily') {
+                    effectiveYield = (Math.pow(1 + (rate / 365), 365) - 1) * 100;
+                } else {
+                    effectiveYield = (Math.pow(1 + (rate / 12), 12) - 1) * 100;
+                }
+            }
 
             document.getElementById('res-total-balance').textContent = formatCurrency(endBalance);
             document.getElementById('res-total-interest').textContent = formatCurrency(totalInterestEarned);
